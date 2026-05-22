@@ -63,7 +63,7 @@ const DashboardLayout = () => {
 
       {/* Sidebar */}
       <aside className={`
-        fixed lg:sticky top-0 h-screen w-64 bg-white border-r border-slate-200 z-50
+        fixed lg:sticky top-0 h-[100dvh] w-64 bg-white border-r border-slate-200 z-50
         transform transition-transform duration-200 ease-in-out flex flex-col
         ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
       `}>
