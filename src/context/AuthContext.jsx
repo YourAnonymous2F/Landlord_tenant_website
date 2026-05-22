@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = async (email, _password) => {
+  const login = async (email, password) => {
     // Mock login logic
     await new Promise((resolve) => setTimeout(resolve, 800));
     
@@ -33,39 +33,48 @@ export const AuthProvider = ({ children }) => {
       (u) => u.email.toLowerCase() === email.toLowerCase()
     );
 
-    if (existingUser) {
-      localStorage.setItem("mock_user", JSON.stringify(existingUser));
-      setUser(existingUser);
-    } else {
-      // Fallback/Default mock user if not found
-      const mockUser = {
-        id: "1",
-        email,
-        name: "John Doe",
-        role: "landlord", // Default to landlord for testing
-      };
-      localStorage.setItem("mock_user", JSON.stringify(mockUser));
-      setUser(mockUser);
+    if (!existingUser) {
+      throw new Error("Account not registered");
     }
+
+    if (existingUser.password !== password) {
+      throw new Error("Incorrect password");
+    }
+
+    localStorage.setItem("mock_user", JSON.stringify(existingUser));
+    setUser(existingUser);
+    return existingUser;
   };
 
-  const register = async (email, _password, name, role) => {
+  const register = async (email, password, name, role) => {
     // Mock register logic
     await new Promise((resolve) => setTimeout(resolve, 800));
+    
+    // Retrieve existing registered users list
+    const registeredUsers = JSON.parse(localStorage.getItem("registered_users") || "[]");
+    
+    // Prevent duplicate emails during registration
+    const emailExists = registeredUsers.some(
+      (u) => u.email.toLowerCase() === email.toLowerCase()
+    );
+    if (emailExists) {
+      throw new Error("Email already registered");
+    }
+
     const mockUser = {
       id: Math.random().toString(36).substr(2, 9),
       email,
+      password, // Store password to verify during login
       name,
       role,
     };
     
-    // Save to the registered users list in localStorage
-    const registeredUsers = JSON.parse(localStorage.getItem("registered_users") || "[]");
     registeredUsers.push(mockUser);
     localStorage.setItem("registered_users", JSON.stringify(registeredUsers));
     
     localStorage.setItem("mock_user", JSON.stringify(mockUser));
     setUser(mockUser);
+    return mockUser;
   };
 
   const logout = async () => {
