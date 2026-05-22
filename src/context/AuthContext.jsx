@@ -26,14 +26,27 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, _password) => {
     // Mock login logic
     await new Promise((resolve) => setTimeout(resolve, 800));
-    const mockUser = {
-      id: "1",
-      email,
-      name: "John Doe",
-      role: "landlord", // Default to landlord for testing
-    };
-    localStorage.setItem("mock_user", JSON.stringify(mockUser));
-    setUser(mockUser);
+    
+    // Retrieve registered users from localStorage
+    const registeredUsers = JSON.parse(localStorage.getItem("registered_users") || "[]");
+    const existingUser = registeredUsers.find(
+      (u) => u.email.toLowerCase() === email.toLowerCase()
+    );
+
+    if (existingUser) {
+      localStorage.setItem("mock_user", JSON.stringify(existingUser));
+      setUser(existingUser);
+    } else {
+      // Fallback/Default mock user if not found
+      const mockUser = {
+        id: "1",
+        email,
+        name: "John Doe",
+        role: "landlord", // Default to landlord for testing
+      };
+      localStorage.setItem("mock_user", JSON.stringify(mockUser));
+      setUser(mockUser);
+    }
   };
 
   const register = async (email, _password, name, role) => {
@@ -45,6 +58,12 @@ export const AuthProvider = ({ children }) => {
       name,
       role,
     };
+    
+    // Save to the registered users list in localStorage
+    const registeredUsers = JSON.parse(localStorage.getItem("registered_users") || "[]");
+    registeredUsers.push(mockUser);
+    localStorage.setItem("registered_users", JSON.stringify(registeredUsers));
+    
     localStorage.setItem("mock_user", JSON.stringify(mockUser));
     setUser(mockUser);
   };
