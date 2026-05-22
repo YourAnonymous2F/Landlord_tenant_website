@@ -1,85 +1,129 @@
 import { createContext, useContext, useState, useEffect } from "react";
+import { auth } from "../firebase/firebase";
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  updateProfile, 
+  onAuthStateChanged 
+} from "firebase/auth";
 
 const AuthContext = createContext();
 
 export const useAuth = () => useContext(AuthContext);
 
+const translateFirebaseError = (error) => {
+  switch (error.code) {
+    case "auth/invalid-credential":
+    case "auth/wrong-password":
+      return new Error("Incorrect password or email.");
+    case "auth/user-not-found":
+      return new Error("Account not registered.");
+    case "auth/email-already-in-use":
+      return new Error("Email already registered.");
+    case "auth/weak-password":
+      return new Error("Password should be at least 6 characters.");
+    case "auth/invalid-email":
+      return new Error("Invalid email address.");
+    default:
+      return new Error(error.message || "An authentication error occurred.");
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Mock authentication check on mount
+  // Sync auth state on mount
   useEffect(() => {
-    const checkAuth = async () => {
-      // Simulate network request
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      
-      const storedUser = localStorage.getItem("mock_user");
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        let name = "User";
+        let role = "landlord";
+
+        if (firebaseUser.displayName) {
+          try {
+            const parsed = JSON.parse(firebaseUser.displayName);
+            name = parsed.name || firebaseUser.displayName;
+            role = parsed.role || "landlord";
+          } catch (e) {
+            name = firebaseUser.displayName;
+          }
+        }
+
+        setUser({
+          id: firebaseUser.uid,
+          email: firebaseUser.email,
+          name,
+          role,
+        });
+      } else {
+        setUser(null);
       }
       setLoading(false);
-    };
-    checkAuth();
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const login = async (email, password) => {
-    // Mock login logic
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    
-    // Retrieve registered users from localStorage
-    const registeredUsers = JSON.parse(localStorage.getItem("registered_users") || "[]");
-    const existingUser = registeredUsers.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase()
-    );
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
 
-    if (!existingUser) {
-      throw new Error("Account not registered");
+      let name = "User";
+      let role = "landlord";
+
+      if (firebaseUser.displayName) {
+        try {
+          const parsed = JSON.parse(firebaseUser.displayName);
+          name = parsed.name || firebaseUser.displayName;
+          role = parsed.role || "landlord";
+        } catch (e) {
+          name = firebaseUser.displayName;
+        }
+      }
+
+      const loggedInUser = {
+        id: firebaseUser.uid,
+        email: firebaseUser.email,
+        name,
+        role,
+      };
+
+      setUser(loggedInUser);
+      return loggedInUser;
+    } catch (error) {
+      throw translateFirebaseError(error);
     }
-
-    if (existingUser.password !== password) {
-      throw new Error("Incorrect password");
-    }
-
-    localStorage.setItem("mock_user", JSON.stringify(existingUser));
-    setUser(existingUser);
-    return existingUser;
   };
 
   const register = async (email, password, name, role) => {
-    // Mock register logic
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    
-    // Retrieve existing registered users list
-    const registeredUsers = JSON.parse(localStorage.getItem("registered_users") || "[]");
-    
-    // Prevent duplicate emails during registration
-    const emailExists = registeredUsers.some(
-      (u) => u.email.toLowerCase() === email.toLowerCase()
-    );
-    if (emailExists) {
-      throw new Error("Email already registered");
-    }
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
 
-    const mockUser = {
-      id: Math.random().toString(36).substr(2, 9),
-      email,
-      password, // Store password to verify during login
-      name,
-      role,
-    };
-    
-    registeredUsers.push(mockUser);
-    localStorage.setItem("registered_users", JSON.stringify(registeredUsers));
-    
-    localStorage.setItem("mock_user", JSON.stringify(mockUser));
-    setUser(mockUser);
-    return mockUser;
+      // Store the custom name and role in the profile's displayName
+      await updateProfile(firebaseUser, {
+        displayName: JSON.stringify({ name, role })
+      });
+
+      const newUser = {
+        id: firebaseUser.uid,
+        email: firebaseUser.email,
+        name,
+        role,
+      };
+
+      setUser(newUser);
+      return newUser;
+    } catch (error) {
+      throw translateFirebaseError(error);
+    }
   };
 
   const logout = async () => {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    localStorage.removeItem("mock_user");
+    await signOut(auth);
     setUser(null);
   };
 
